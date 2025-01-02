@@ -1,0 +1,49 @@
+- name: Remove CloudWatch Agent from Ubuntu
+  hosts: vipin
+  become: yes
+  tasks:
+
+    # Stop the CloudWatch Agent service
+    - name: Stop CloudWatch Agent service
+      systemd:
+        name: amazon-cloudwatch-agent
+        state: stopped
+
+    # Disable the CloudWatch Agent service
+    - name: Disable CloudWatch Agent service
+      systemd:
+        name: amazon-cloudwatch-agent
+        enabled: no
+
+    # Remove the CloudWatch Agent package
+    - name: Remove CloudWatch Agent package
+      apt:
+        name: amazon-cloudwatch-agent
+        state: absent
+
+    # Remove configuration and related files
+    - name: Remove CloudWatch Agent files
+      file:
+        path: /opt/aws/amazon-cloudwatch-agent
+        state: absent
+
+    - name: Remove downloaded package
+      file:
+        path: /tmp/amazon-cloudwatch-agent.deb
+        state: absent
+
+    # Clean up dependencies
+    - name: Remove unused dependencies
+      apt:
+        autoremove: yes
+        purge: yes
+
+    # Validate removal
+    - name: Verify CloudWatch Agent removal
+      command: dpkg -l | grep amazon-cloudwatch-agent
+      register: removal_status
+      failed_when: removal_status.rc == 0
+
+    - name: Display CloudWatch Agent removal status
+      debug:
+        msg: "CloudWatch Agent has been successfully removed."
