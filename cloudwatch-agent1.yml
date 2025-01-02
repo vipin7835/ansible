@@ -1,0 +1,71 @@
+- name: Install and Configure CloudWatch Agent on Ubuntu
+  hosts: vipin
+  become: yes
+  tasks:
+
+    # Install dependencies
+    - name: Install dependencies
+      apt:
+        name:
+          - curl
+          - unzip
+        state: present
+        update_cache: yes
+
+    # Download the CloudWatch agent package
+    - name: Download CloudWatch Agent package
+      get_url:
+        url: "https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb"
+        dest: /tmp/amazon-cloudwatch-agent.deb
+
+    # Install the CloudWatch agent package
+    - name: Install CloudWatch Agent
+      apt:
+        deb: /tmp/amazon-cloudwatch-agent.deb
+        state: present
+
+    # Enable and start the CloudWatch agent service
+    - name: Enable and start the CloudWatch agent service
+      systemd:
+        name: amazon-cloudwatch-agent
+        enabled: yes
+        state: started
+
+    # Create CloudWatch Agent configuration directory
+    - name: Ensure CloudWatch Agent config directory exists
+      file:
+        path: /opt/aws/amazon-cloudwatch-agent/etc
+        state: directory
+
+    # Copy CloudWatch Agent configuration file
+    - name: Copy CloudWatch Agent configuration file
+      template:
+        src: cloudwatch-agent-config.json.j2
+        dest: /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+        owner: root
+        group: root
+        mode: '0644'
+
+    # Configure the CloudWatch agent to start with the correct config
+    - name: Apply CloudWatch Agent configuration
+      shell: |
+        /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+        -a fetch-config \
+        -m ec2 \
+        -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json \
+        -s
+
+    # Restart CloudWatch agent to apply the configuration
+    - name: Restart CloudWatch agent
+      systemd:
+        name: amazon-cloudwatch-agent
+        state: restarted
+
+    # Validate CloudWatch agent status
+    - name: Validate CloudWatch Agent status
+      command: /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a status
+      register: agent_status
+
+    - name: Display CloudWatch Agent status
+      debug:
+        var: agent_status.stdout
